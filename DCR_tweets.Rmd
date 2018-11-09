@@ -10,10 +10,10 @@ output:
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 
 # Put your API Keys here
-api_key <- "T15fFdhwXfaBCKciTQNK49UnT"
-api_secret <- "y3YykPuxcIVtEs4m3EKcKo6b1V3uGYkfIOFzjP6LxCKmpYnApt"
-access_token <- "4701800378-dXKPM1DLcSczmt5bWOT9fXMkyhxozvqXMqCe7gv"
-access_token_secret <- "63c4cYKPNYjJYeeCq4lJ7oTZasIWFV5ECRv9PQ9toCv7T"
+api_key <- ""
+api_secret <- ""
+access_token <- ""
+access_token_secret <- ""
 
 
 ```
@@ -41,12 +41,29 @@ twitter_token <- create_token(
   , access_secret = access_token_secret)
 
 rstats_tweets <- search_tweets(q = "#rstatsdc",
-                               n = 500)
+                               n = 2000)
+
+temp<-gsub('\"',"", rstats_tweets$mentions_screen_name, fixed=TRUE)
+temp<-gsub('c(',"", temp, fixed=TRUE)
+temp<-gsub(")","",temp)
+temp<-gsub(" ","",temp)
+temp<-gsub(","," @", temp, fixed=TRUE)
+temp<-paste0("@",temp)
+rstats_tweets$mentions<-temp
+temp<-gsub('\"',"", rstats_tweets$hashtags, fixed=TRUE)
+temp<-gsub('c(',"", temp, fixed=TRUE)
+temp<-gsub(")","",temp)
+temp<-gsub(" ","",temp)
+temp<-gsub(","," #", temp, fixed=TRUE)
+temp<-paste0("#",temp)
+rstats_tweets$tags<-temp
+rstats_tweets$screen_name<-paste0("@",rstats_tweets$screen_name)
+
+
 return(rstats_tweets)
 }
 
 rstats_tweets<-get_tweets.fun(tag=tag)
-
 
 
 ```
@@ -110,42 +127,12 @@ wordcloud(nc_2$ngrams,nc_2$freq,max.words=100,random.order = F, colors=brewer.pa
 
 
 
-
-
-### Top 25 Tweeters
-
-```{r, message=FALSE, warning=FALSE}
-# resetting par() to it's original state after modifying it for side-by-side wordclouds
-par(opar)
-
-library(highcharter) # better than ggplot2. sorry not sorry
-
-user_count<- rstats_tweets  %>% filter(screen_name!="rstatstweet" & screen_name!="rstatsnyc" & screen_name!="rstatsdc") %>%
-  count(screen_name) %>% 
-  arrange(desc(n)) 
-
-
-x <- c("Handle", "Tweet Count " )
-y <- sprintf("{point.%s}", c("screen_name","n"))
-user_count_tooltip <- tooltip_table(x, y)
-
-# if you get errors here, remove the quotes from both hcaes() arguments.  Then complain to Hadley.
-hchart(user_count[1:25,], "column",hcaes("screen_name" ,"n")) %>%
-   hc_xAxis(title=list(text="Twitter Handle"), labels=list(style=list(fontsize=14, color="slategrey")) ) %>%
-   hc_yAxis(title=list(text="Tweets | 2018/11/07 - 2018/11/09") ) %>%
-   hc_tooltip(useHTML = TRUE, headerFormat = "", pointFormat = user_count_tooltip) %>% 
-   hc_title(text='DCR Tweet Count')
-
-
-```
-
-
-
-
 ### Tweets Over Time
 
 ```{r, message=FALSE, warning=FALSE}
 library(lubridate)
+library(highcharter) # better than ggplot2. sorry not sorry
+
 rstats_tweets$hour<-floor_date(rstats_tweets$created_at, "hour")
 
 hour_count<- rstats_tweets  %>% group_by(hour) %>%
@@ -166,5 +153,84 @@ hc_add_series_times_values(hour_count$hour ,values=hour_count$n, showInLegend=FA
 
 
 
+### Top 25 Tweeters
+
+```{r, message=FALSE, warning=FALSE}
+# resetting par() to it's original state after modifying it for side-by-side wordclouds
+par(opar)
+
+
+user_count<- rstats_tweets  %>% filter(screen_name!="@rstatstweet" & screen_name!="@rstatsnyc" & screen_name!="@rstatsdc") %>% group_by(screen_name) %>%
+  summarize(n=n(), retweets=length(is_retweet[is_retweet==TRUE]), original_tweets=length(is_retweet[is_retweet==FALSE])) %>% 
+  arrange(desc(n)) 
+
+
+x <- c("Handle", "Tweet Coxunt ", "Original Tweets ", "Retweets " )
+y <- sprintf("{point.%s}", c("screen_name","n", "original_tweets", "retweets"))
+user_count_tooltip <- tooltip_table(x, y)
+
+# if you get errors here, remove the quotes from both hcaes() arguments.  Then complain to Hadley.
+hchart(user_count[1:25,], "column",hcaes("screen_name" ,"n")) %>%
+   hc_xAxis(title=list(text="Twitter Handle"), labels=list(style=list(fontsize=14, color="slategrey")) ) %>%
+   hc_yAxis(title=list(text="Tweet Count") ) %>%
+   hc_tooltip(useHTML = TRUE, headerFormat = "", pointFormat = user_count_tooltip) %>% 
+   hc_title(text='DCR #rstatsdc Tweet Count')
+
+```
+
+
+### But... are they original?
+```{r}
+
+x <- c("Handle", "Tweet Count ", "Original Tweets " )
+y <- sprintf("{point.%s}", c("screen_name","n", "original_tweets"))
+user_count_tooltip <- tooltip_table(x, y)
+
+user_count$screen_name<-as.character(user_count$screen_name)
+# force it to stay in the original order rather than ordered by the first series, retweets
+user_count$screen_name<-factor(user_count$screen_name, levels=unique(user_count$screen_name))
+  hc_add_series(highchart(), user_count[1:25,], "column",hcaes("screen_name" ,"retweets"), name="Retweets") %>%
+  hc_add_series(user_count[1:25,], "column",hcaes("screen_name" ,"original_tweets"), name="Original Tweets") %>%
+   hc_xAxis( title=list(text=""), labels=list(style=list(fontsize=14, color="slategrey")) , type="category") %>%
+   hc_yAxis(title=list(text="Tweet Count") ) %>%
+   hc_tooltip(useHTML = TRUE, headerFormat = "", pointFormat = user_count_tooltip) %>% 
+   hc_title(text='DCR #rstatsdc Tweet Count') %>% hc_plotOptions(column=list(stacking="normal")) 
+  #%>% hc_legend(align = "right", verticalAlign = "top", layout = "vertical") 
+
+  
+  user_count<- user_count %>% arrange(desc(original_tweets))
+```
+
+ 
+
+<center>
+
+<font size="40"> 1st Place OT: `r user_count$screen_name[1]`
+</font>
+<font size="35">
+2nd Place OT: `r user_count$screen_name[2]`
+</font>
+<font size="30">
+3nd Place Original Tweeter: `r user_count$screen_name[3]`
+</font>
+<font size="25">
+4nd Place OT: `r user_count$screen_name[4]`
+</font>
+<font size="20">
+5nd Place Original Tweeter: `r user_count$screen_name[5]`
+</font>
+</center>
+
+
+```{r, message=FALSE, warning=FALSE}
+user_count$screen_name<-as.character(user_count$screen_name)
+
+highchart()%>%
+  hc_add_series(user_count[1:25,], "column",hcaes("screen_name" ,"original_tweets"), showInLegend=FALSE) %>%
+   hc_xAxis(title=list(text=""), labels=list(style=list(fontsize=14, color="slategrey")) , type="category") %>%
+   hc_yAxis(title=list(text="Tweet Count") ) %>%
+   hc_tooltip(useHTML = TRUE, headerFormat = "", pointFormat = user_count_tooltip) %>% 
+   hc_title(text='DCR #rstatsdc Tweet Count') %>% hc_plotOptions(column=list(stacking="normal"))
+```
 
 
