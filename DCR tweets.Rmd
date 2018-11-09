@@ -1,0 +1,57 @@
+---
+title: "Tweets"
+output: html_document
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+#rstatsdc
+library(tidyverse)
+library(rtweet)
+library(raster)
+library(rgdal)
+#library(lubridate)
+
+tag='rstatsdc'
+get_tweets.fun<-function(tag){
+
+max.tweets=5000
+#since=as.character(Sys.Date()-1)
+#until=as.character(Sys.Date()+1)
+
+
+seed.num=1234
+# Set API Keys
+api_key <- "T15fFdhwXfaBCKciTQNK49UnT"
+api_secret <- "y3YykPuxcIVtEs4m3EKcKo6b1V3uGYkfIOFzjP6LxCKmpYnApt"
+access_token <- "4701800378-dXKPM1DLcSczmt5bWOT9fXMkyhxozvqXMqCe7gv"
+access_token_secret <- "63c4cYKPNYjJYeeCq4lJ7oTZasIWFV5ECRv9PQ9toCv7T"
+
+
+
+twitter_token <- create_token(
+  
+  consumer_key = api_key,
+  consumer_secret =  api_secret
+  ,access_token=access_token
+  , access_secret = access_token_secret)
+
+rstats_tweets <- search_tweets(q = "#rstatsdc",
+                               n = 500)
+return(rstats_tweets)
+}
+
+stats_tweets<-get_tweets.fun(tag=tag)
+media_id<-data.frame(media_id=unlist(rstats_tweets$media_url)
+                     , date=rstats_tweets$created_at) %>%
+   filter(!is.na(media_id) 
+          & date>="2018-11-07")
+
+for(i in 1:10){
+ 
+  myJPG <- stack(as.character(media_id$media_id[i]))
+  plotRGB(myJPG) 
+  
+}
+```
